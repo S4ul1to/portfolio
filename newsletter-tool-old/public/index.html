@@ -1,0 +1,796 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Biola newsletter tool</title>
+<meta name="description" content="One button collects the latest news on a topic, builds a newsletter in Biola University's brand, and emails it to you.">
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="/brand.css">
+<style>
+  /* Every color and font comes from /brand.css (generated from src/brand.js). */
+
+  *, *::before, *::after { box-sizing: border-box; }
+
+  html {
+    -webkit-text-size-adjust: 100%;
+    scroll-behavior: smooth;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    min-height: 100dvh;
+    display: flex;
+    flex-direction: column;
+    font-family: var(--font-body);
+    font-size: 16px;
+    line-height: 1.5;
+    color: var(--biola-black);
+    background: var(--sky-blue);
+  }
+
+  [hidden] { display: none !important; }
+
+  /* Skip link */
+
+  .skip-link {
+    position: absolute;
+    top: -100px;
+    left: 16px;
+    z-index: 10;
+    min-height: 44px;
+    padding: 10px 16px;
+    font-weight: 700;
+    color: var(--biola-black);
+    background: var(--biola-white);
+    text-decoration: none;
+    border-radius: var(--radius);
+  }
+
+  .skip-link:focus-visible {
+    top: 10px;
+    outline: 3px solid var(--biola-red);
+    outline-offset: 2px;
+  }
+
+  /* Header */
+
+  .masthead {
+    color: var(--biola-white);
+    background: var(--biola-black);
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+
+  .masthead-inner {
+    max-width: 1200px;
+    height: 64px;
+    margin: 0 auto;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .wordmark {
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    white-space: nowrap;
+  }
+
+  .wordmark-name {
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 20px;
+    letter-spacing: 4px;
+    line-height: 1;
+  }
+
+  .wordmark-sub {
+    font-family: var(--font-body);
+    font-size: 11px;
+    letter-spacing: 3px;
+    line-height: 1;
+  }
+
+  .pill {
+    display: inline-block;
+    padding: 6px 10px;
+    font-size: 12px;
+    font-weight: 700;
+    line-height: 1.2;
+    white-space: nowrap;
+    border-radius: var(--radius);
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  .pill-pending { color: var(--slate); background: var(--biola-white); }
+  .pill-ready { color: var(--biola-black); background: var(--sky-blue); }
+  .pill-setup { color: var(--biola-red); background: var(--biola-white); }
+
+  /* Main ground and layout */
+
+  .ground {
+    flex: 1 0 auto;
+    background-color: var(--sky-blue);
+    background-image: var(--dot-grid);
+    background-size: var(--dot-grid-size);
+  }
+
+  .layout {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+    padding-block: 32px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+    gap: 32px;
+    align-items: start; /* the panel keeps its own height; the preview column may be taller */
+  }
+
+  .layout > * { min-width: 0; }
+
+  /* Left column: the panel */
+
+  .panel {
+    padding: 32px;
+    background: var(--biola-white);
+    border-top: 6px solid var(--biola-red);
+  }
+
+  h1 {
+    margin: 0 0 12px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 34px;
+    line-height: 1.05;
+    text-wrap: balance;
+    color: var(--biola-black);
+  }
+
+  .lede {
+    margin: 0 0 24px;
+    color: var(--slate);
+  }
+
+  .topic-form {
+    display: grid;
+    gap: 8px;
+  }
+
+  label {
+    font-weight: 700;
+  }
+
+  input[type="text"] {
+    width: 100%;
+    height: 48px;
+    padding: 0 12px;
+    font-family: var(--font-body);
+    font-size: 16px;
+    color: var(--biola-black);
+    background: var(--biola-white);
+    border: 2px solid var(--rule);
+    border-radius: var(--radius);
+    transition: border-color 200ms ease;
+  }
+
+  input[type="text"]:hover { border-color: var(--ink-muted); }
+
+  input[type="text"]:focus {
+    border-color: var(--biola-red);
+    outline: 3px solid var(--sky-blue);
+    outline-offset: 2px;
+  }
+
+  .help {
+    margin: 0;
+    font-size: 14px;
+    color: var(--ink-muted);
+  }
+
+  .field-error {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 700;
+    color: var(--biola-red);
+  }
+
+  .button-primary {
+    margin-top: 8px;
+    width: 100%;
+    min-height: 52px;
+    padding: 12px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 16px;
+    letter-spacing: 1px;
+    line-height: 1.2;
+    color: var(--biola-white);
+    background: var(--biola-red);
+    border: 0;
+    border-radius: var(--radius);
+    cursor: pointer;
+    transition: background-color 200ms ease, transform 150ms ease;
+  }
+
+  /* Hover goes to black, not Electric Red: white on Electric Red is 3.63:1 (fails AA),
+     white on black is 21:1, and red to black is Biola's core pairing. */
+  .button-primary:hover { background: var(--biola-black); }
+  .button-primary:active { transform: translateY(1px); }
+
+  .button-primary:focus-visible {
+    outline: 3px solid var(--biola-black);
+    outline-offset: 2px;
+  }
+
+  .button-primary:disabled {
+    background: var(--ink-muted);
+    cursor: progress;
+    transform: none;
+  }
+
+  .deliver {
+    margin: 16px 0 0;
+    font-size: 14px;
+    color: var(--slate);
+    overflow-wrap: anywhere;
+  }
+
+  .setup {
+    margin: 12px 0 0;
+    padding: 10px 12px;
+    font-size: 14px;
+    color: var(--biola-black);
+    background: var(--sky-blue);
+    border-left: 4px solid var(--biola-red);
+    overflow-wrap: anywhere;
+  }
+
+  /* Progress */
+
+  .progress {
+    margin-top: 28px;
+    padding-top: 24px;
+    border-top: 1px solid var(--rule);
+  }
+
+  .steps {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: grid;
+    gap: 12px;
+  }
+
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: var(--slate);
+  }
+
+  .marker {
+    flex: 0 0 auto;
+    width: 10px;
+    height: 10px;
+    background: var(--rule);
+    transition: background-color 200ms ease;
+  }
+
+  .step.is-active {
+    color: var(--biola-black);
+    font-weight: 700;
+  }
+
+  .step.is-active .marker {
+    background: var(--biola-red);
+    animation: pulse 1s ease-in-out infinite;
+  }
+
+  .step.is-done .marker { background: var(--biola-black); }
+
+  .step.is-failed {
+    color: var(--biola-red);
+    font-weight: 700;
+  }
+
+  .step.is-failed .marker {
+    background: var(--biola-red);
+    animation: none;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  .progress-foot {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    min-height: 24px;
+    margin-top: 16px;
+  }
+
+  .status-line {
+    margin: 0;
+    font-size: 14px;
+    color: var(--slate);
+    overflow-wrap: anywhere;
+  }
+
+  .timer {
+    flex: 0 0 auto;
+    font-size: 14px;
+    color: var(--slate);
+    font-variant-numeric: tabular-nums;
+  }
+
+  .result {
+    margin: 12px 0 0;
+    color: var(--biola-black);
+    overflow-wrap: anywhere;
+  }
+
+  .result.is-error { color: var(--biola-red); }
+  .result:empty { display: none; }
+
+  /* Right column: the preview */
+
+  .preview-head {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    gap: 16px;
+    margin-bottom: 12px;
+  }
+
+  .preview-head h2 {
+    margin: 0;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 16px;
+    color: var(--biola-black);
+  }
+
+  .preview-note {
+    margin: 0;
+    font-size: 14px;
+    text-align: right;
+    color: var(--slate);
+  }
+
+  #preview {
+    display: block;
+    width: 100%;
+    height: 720px;
+    background: var(--biola-white);
+    border: 1px solid var(--rule);
+  }
+
+  /* Footer */
+
+  .colophon {
+    padding: 24px max(16px, env(safe-area-inset-right, 0px)) 24px max(16px, env(safe-area-inset-left, 0px));
+    font-size: 13px;
+    text-align: center;
+    color: var(--slate);
+    background: var(--biola-white);
+    border-top: 1px solid var(--rule);
+  }
+
+  .colophon p { margin: 0; }
+
+  .colophon a {
+    color: inherit;
+    text-decoration: underline;
+    text-underline-offset: 2px;
+    cursor: pointer;
+    transition: color 200ms ease;
+  }
+
+  .colophon a:hover { color: var(--biola-red); }
+
+  .colophon a:focus-visible {
+    outline: 2px solid var(--biola-black);
+    outline-offset: 2px;
+  }
+
+  /* Two columns from 960px */
+
+  @media (min-width: 960px) {
+    .layout { grid-template-columns: 5fr 7fr; }
+
+    .button-primary {
+      height: 52px;
+      padding: 0 8px;
+      white-space: nowrap;
+    }
+
+    #preview { height: min(1100px, calc(100vh - 200px)); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    html { scroll-behavior: auto; }
+
+    *, *::before, *::after {
+      transition-duration: 0.01ms !important;
+      animation: none !important;
+    }
+  }
+</style>
+</head>
+<body>
+<a class="skip-link" href="#main">Skip to main content</a>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <p class="wordmark"><span class="wordmark-name">BIOLA</span><span class="wordmark-sub">UNIVERSITY</span></p>
+    <span id="status" class="pill pill-pending" title="Checking the server configuration.">Checking setup</span>
+  </div>
+</header>
+
+<main id="main" class="ground">
+  <div class="layout">
+    <section class="panel" aria-labelledby="heading">
+      <h1 id="heading">Today’s news, in Biola’s colors, in your inbox.</h1>
+      <p class="lede">One click searches the web for recent coverage, writes a branded issue, and emails it to you.</p>
+
+      <form id="form" class="topic-form" novalidate>
+        <label for="topic">Topic</label>
+        <input id="topic" name="topic" type="text" required maxlength="120" value="Artificial intelligence in higher education" autocomplete="off" aria-describedby="topicHelp topicError">
+        <p id="topicHelp" class="help">Try campus sustainability, athletics and NIL, or graduate enrollment.</p>
+        <p id="topicError" class="field-error" hidden></p>
+        <button id="send" type="submit" class="button-primary">Generate and email newsletter</button>
+      </form>
+
+      <p id="deliverTo" class="deliver">Delivers to the address set in .env.</p>
+      <p id="pipeline" class="deliver" hidden></p>
+      <p id="setup" class="setup" hidden></p>
+
+      <div id="progress" class="progress">
+        <ol id="steps" class="steps" role="list">
+          <li class="step" data-stage="search"><span class="marker" aria-hidden="true"></span><span class="step-text">Collect the latest coverage</span></li>
+          <li class="step" data-stage="write"><span class="marker" aria-hidden="true"></span><span class="step-text">Write the newsletter</span></li>
+          <li class="step" data-stage="send"><span class="marker" aria-hidden="true"></span><span class="step-text">Send to your inbox</span></li>
+        </ol>
+        <div class="progress-foot">
+          <p id="statusLine" class="status-line" aria-live="polite"></p>
+          <span id="timer" class="timer"></span>
+        </div>
+      </div>
+
+      <p id="result" class="result" aria-live="polite"></p>
+    </section>
+
+    <section class="preview-column" aria-labelledby="previewHeading">
+      <div class="preview-head">
+        <h2 id="previewHeading">Preview</h2>
+        <p id="previewNote" class="preview-note">Sample issue</p>
+      </div>
+      <iframe id="preview" title="Newsletter preview" src="/api/preview" sandbox="allow-popups allow-popups-to-escape-sandbox"></iframe>
+    </section>
+  </div>
+</main>
+
+<footer class="colophon">
+  <p>Built with Claude Code for a class project. Styled after Biola University’s <a href="https://www.biola.edu/brand" rel="noopener">brand standards</a>. Not an official Biola communication.</p>
+</footer>
+
+<script>
+(function () {
+  'use strict';
+
+  const byId = (id) => document.getElementById(id);
+
+  const form = byId('form');
+  const topicInput = byId('topic');
+  const topicError = byId('topicError');
+  const sendButton = byId('send');
+  const statusPill = byId('status');
+  const deliverTo = byId('deliverTo');
+  const pipeline = byId('pipeline');
+  const setupNotice = byId('setup');
+  const progress = byId('progress');
+  const steps = Array.from(byId('steps').querySelectorAll('li'));
+  const statusLine = byId('statusLine');
+  const timer = byId('timer');
+  const result = byId('result');
+  const preview = byId('preview');
+  const previewNote = byId('previewNote');
+
+  const STAGES = steps.map((li) => li.dataset.stage);
+  const STEP_STATES = ['is-active', 'is-done', 'is-failed'];
+  const MAX_TOPIC_LENGTH = 120;
+
+  let running = false;
+  let timerHandle = null;
+  let startedAt = 0;
+
+  // Steps
+
+  function setStepState(li, state) {
+    li.classList.remove(...STEP_STATES);
+    if (state) li.classList.add(state);
+    if (state === 'is-active') {
+      li.setAttribute('aria-current', 'step');
+    } else {
+      li.removeAttribute('aria-current');
+    }
+  }
+
+  function resetSteps() {
+    steps.forEach((li) => setStepState(li, null));
+    statusLine.textContent = '';
+  }
+
+  function markStage(stage, message) {
+    const index = STAGES.indexOf(stage);
+    if (index < 0) return;
+    steps.forEach((li, i) => {
+      if (i < index) setStepState(li, 'is-done');
+      else if (i === index) setStepState(li, 'is-active');
+      else setStepState(li, null);
+    });
+    if (typeof message === 'string' && message) statusLine.textContent = message;
+  }
+
+  function markAllDone() {
+    steps.forEach((li) => setStepState(li, 'is-done'));
+  }
+
+  function failActiveStep() {
+    const active = steps.find((li) => li.classList.contains('is-active'));
+    if (active) setStepState(active, 'is-failed');
+  }
+
+  // Timer
+
+  function pad(n) {
+    return String(n).padStart(2, '0');
+  }
+
+  function formatElapsed(ms) {
+    const total = Math.max(0, Math.floor(ms / 1000));
+    return pad(Math.floor(total / 60)) + ':' + pad(total % 60);
+  }
+
+  function tick() {
+    timer.textContent = formatElapsed(Date.now() - startedAt);
+  }
+
+  function stopTimer() {
+    if (timerHandle === null) return;
+    window.clearInterval(timerHandle);
+    timerHandle = null;
+    tick();
+  }
+
+  function startTimer() {
+    stopTimer();
+    startedAt = Date.now();
+    tick();
+    timerHandle = window.setInterval(tick, 250);
+  }
+
+  // Messages
+
+  function showResult(text, isError) {
+    result.textContent = text;
+    result.classList.toggle('is-error', Boolean(isError));
+  }
+
+  function showFieldError(text) {
+    topicError.textContent = text;
+    topicError.hidden = false;
+    topicInput.setAttribute('aria-invalid', 'true');
+  }
+
+  function clearFieldError() {
+    topicError.textContent = '';
+    topicError.hidden = true;
+    topicInput.removeAttribute('aria-invalid');
+  }
+
+  function formatLocalTime(iso) {
+    let date = new Date(iso || Date.now());
+    if (Number.isNaN(date.getTime())) date = new Date();
+    return date.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  }
+
+  // Configuration pill, delivery line and setup notice
+
+  function applyConfig(config) {
+    const missing = Array.isArray(config.missing) ? config.missing : [];
+    statusPill.classList.remove('pill-pending', 'pill-ready', 'pill-setup');
+
+    if (config.ready) {
+      statusPill.textContent = 'Ready to send';
+      statusPill.classList.add('pill-ready');
+      statusPill.title = 'All required variables are set. Writer: ' + (config.writer || 'built-in template') + '.';
+      setupNotice.textContent = '';
+      setupNotice.hidden = true;
+    } else {
+      statusPill.textContent = 'Setup needed';
+      statusPill.classList.add('pill-setup');
+      statusPill.title = missing.length ? 'Missing: ' + missing.join(', ') : 'Setup is incomplete.';
+      setupNotice.textContent = (missing.length ? 'Missing ' + missing.join(', ') + '. ' : 'Setup is incomplete. ')
+        + 'Copy .env.example to .env to set them.';
+      setupNotice.hidden = false;
+    }
+
+    deliverTo.textContent = config.to
+      ? 'Delivers to ' + config.to
+      : 'Delivery address not set. Add SMTP_USER or TO_EMAIL to .env.';
+
+    if (config.sources || config.writer) {
+      pipeline.textContent = 'Sources: ' + (config.sources || 'the web') + '. Writer: ' + (config.writer || 'built-in template') + '.';
+      pipeline.hidden = false;
+    }
+  }
+
+  async function loadConfig() {
+    try {
+      const response = await fetch('/api/config', { headers: { accept: 'application/json' } });
+      if (!response.ok) throw new Error('HTTP ' + response.status);
+      applyConfig(await response.json());
+    } catch (err) {
+      statusPill.classList.remove('pill-pending', 'pill-ready');
+      statusPill.classList.add('pill-setup');
+      statusPill.textContent = 'Setup unknown';
+      statusPill.title = 'Could not read /api/config. ' + (err && err.message ? err.message : '');
+      deliverTo.textContent = 'Delivery address unknown until the server responds.';
+    }
+  }
+
+  // Newline-delimited JSON stream
+
+  async function readEvents(body, onEvent) {
+    const reader = body.getReader();
+    const decoder = new TextDecoder();
+    let buffer = '';
+
+    const handleLine = (line) => {
+      const trimmed = line.trim();
+      if (!trimmed) return;
+      let event;
+      try {
+        event = JSON.parse(trimmed);
+      } catch (err) {
+        return;
+      }
+      if (event && typeof event === 'object') onEvent(event);
+    };
+
+    for (;;) {
+      const chunk = await reader.read();
+      if (chunk.done) break;
+      buffer += decoder.decode(chunk.value, { stream: true });
+      let newline = buffer.indexOf('\n');
+      while (newline >= 0) {
+        handleLine(buffer.slice(0, newline));
+        buffer = buffer.slice(newline + 1);
+        newline = buffer.indexOf('\n');
+      }
+    }
+    buffer += decoder.decode();
+    handleLine(buffer);
+  }
+
+  // Run outcomes
+
+  function onDone(evt) {
+    markAllDone();
+    statusLine.textContent = 'Delivered.';
+    const sources = Number(evt.sources) || 0;
+    const to = typeof evt.to === 'string' && evt.to ? evt.to : 'your inbox';
+    const subject = typeof evt.subject === 'string' && evt.subject ? evt.subject : '(no subject)';
+    const writer = typeof evt.writer === 'string' && evt.writer ? ' ' + evt.writer : '';
+    showResult(
+      'Sent to ' + to + ' at ' + formatLocalTime(evt.sentAt) + '. Subject: ' + subject + '. '
+        + sources + (sources === 1 ? ' source.' : ' sources.') + writer,
+      false,
+    );
+    if (typeof evt.html === 'string' && evt.html) {
+      preview.removeAttribute('src');
+      preview.srcdoc = evt.html;
+      previewNote.textContent = 'This is the email that was sent';
+    }
+  }
+
+  function onError(message) {
+    failActiveStep();
+    showResult(typeof message === 'string' && message ? message : 'The run failed.', true);
+  }
+
+  // Submit
+
+  async function handleSubmit(event) {
+    event.preventDefault();
+    if (running) return;
+
+    const topic = topicInput.value.trim();
+    clearFieldError();
+    if (!topic) {
+      showFieldError('Enter a topic to search for.');
+      topicInput.focus();
+      return;
+    }
+    if (topic.length > MAX_TOPIC_LENGTH) {
+      showFieldError('Keep the topic to ' + MAX_TOPIC_LENGTH + ' characters or fewer.');
+      topicInput.focus();
+      return;
+    }
+
+    running = true;
+    sendButton.disabled = true;
+    progress.setAttribute('aria-busy', 'true');
+    resetSteps();
+    showResult('', false);
+    startTimer();
+
+    let finished = false;
+    try {
+      const response = await fetch('/api/send', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ topic }),
+      });
+
+      if (!response.ok) {
+        let message = 'Request failed (HTTP ' + response.status + ').';
+        try {
+          const data = await response.json();
+          if (data && typeof data.error === 'string' && data.error) message = data.error;
+        } catch (err) {
+          // Not JSON. Keep the HTTP message.
+        }
+        if (response.status === 400) {
+          showFieldError(message);
+          topicInput.focus();
+        } else {
+          showResult(message, true);
+        }
+        return;
+      }
+
+      if (!response.body) {
+        showResult('This browser cannot read the progress stream.', true);
+        return;
+      }
+
+      await readEvents(response.body, (evt) => {
+        if (evt.event === 'stage') {
+          markStage(evt.stage, evt.message);
+        } else if (evt.event === 'done') {
+          finished = true;
+          onDone(evt);
+        } else if (evt.event === 'error') {
+          finished = true;
+          onError(evt.message);
+        }
+      });
+
+      if (!finished) onError('The connection closed before the run finished.');
+    } catch (err) {
+      if (!finished) onError('Could not reach the server. Check that it is running and try again.');
+    } finally {
+      stopTimer();
+      sendButton.disabled = false;
+      progress.removeAttribute('aria-busy');
+      running = false;
+    }
+  }
+
+  form.addEventListener('submit', handleSubmit);
+  loadConfig();
+})();
+</script>
+</body>
+</html>
